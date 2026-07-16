@@ -21,12 +21,13 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use ui::{Color, Icon, IconName, Label, LabelCommon as _, SharedString};
+use ui::{Color, Icon, IconName, Label, LabelCommon as _, SharedString, prelude::*, utils::WithRemSize};
 use util::paths::PathExt as _;
 use workspace::{
     Item, ItemHandle as _, ItemNavHistory, ToolbarItemLocation, Workspace,
     item::{ItemEvent, SaveOptions, TabContentParams},
     searchable::SearchableItemHandle,
+    ToolbarItemEvent, ToolbarItemView,
 };
 
 pub struct FileDiffView {
@@ -177,11 +178,22 @@ impl FileDiffView {
                         )
                     })
                     .await;
+                    this.update(cx, |_, cx| cx.notify()).ok();
                     log::trace!("finish recalculating");
                 }
                 Ok(())
             }),
         }
+    }
+
+    pub fn changed_row_counts(&self, cx: &App) -> Option<(u32, u32)> {
+        let editor = self.editor.read(cx);
+        let multibuffer = editor.rhs_editor().read(cx).buffer().read(cx);
+        let snapshot = multibuffer.snapshot(cx);
+        let buffer_id = self.new_buffer.read(cx).remote_id();
+        snapshot
+            .diff_for_buffer_id(buffer_id)
+            .map(|diff| diff.changed_row_counts())
     }
 }
 
@@ -385,6 +397,66 @@ impl Render for FileDiffView {
     }
 }
 
+pub struct FileDiffToolbar {
+    file_diff: Option<WeakEntity<FileDiffView>>,
+    _subscription: Option<gpui::Subscription>,
+}
+
+impl FileDiffToolbar {
+    pub fn new(_cx: &mut Context<Self>) -> Self {
+        Self {
+            file_diff: None,
+            _subscription: None,
+        }
+    }
+}
+
+impl EventEmitter<ToolbarItemEvent> for FileDiffToolbar {}
+
+impl ToolbarItemView for FileDiffToolbar {
+    fn set_active_pane_item(
+        &mut self,
+        active_pane_item: Option<&dyn workspace::ItemHandle>,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> ToolbarItemLocation {
+        self._subscription = None;
+        self.file_diff = active_pane_item
+            .and_then(|item| item.act_as::<FileDiffView>(cx))
+            .map(|entity| entity.downgrade());
+        if let Some(file_diff) = self.file_diff.as_ref().and_then(|d| d.upgrade()) {
+            self._subscription = Some(cx.observe(&file_diff, |_this, _, cx| {
+                cx.notify();
+            }));
+            ToolbarItemLocation::PrimaryRight
+        } else {
+            ToolbarItemLocation::Hidden
+        }
+    }
+}
+
+impl Render for FileDiffToolbar {
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let Some(file_diff) = self.file_diff.as_ref().and_then(|d| d.upgrade()) else {
+            return gpui::Empty.into_any_element();
+        };
+
+        if let Some((added, removed)) = file_diff.read(cx).changed_row_counts(cx) {
+            let ui_font_size = theme_settings::ThemeSettings::get_global(cx).ui_font_size(cx);
+            div()
+                .pr_2()
+                .child(WithRemSize::new(ui_font_size).child(ui::DiffStat::new(
+                    "file-diff-toolbar-diff-stat",
+                    added as usize,
+                    removed as usize,
+                )))
+                .into_any_element()
+        } else {
+            gpui::Empty.into_any_element()
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -463,6 +535,10 @@ mod tests {
             ),
         );
 
+        diff_view.read_with(cx, |diff_view, cx| {
+            assert_eq!(diff_view.changed_row_counts(cx), Some((2, 2)));
+        });
+
         // Modify the new file on disk
         fs.save(
             path!("/test/new_file.txt").as_ref(),
@@ -500,6 +576,10 @@ mod tests {
                 ",
             ),
         );
+
+        diff_view.read_with(cx, |diff_view, cx| {
+            assert_eq!(diff_view.changed_row_counts(cx), Some((3, 2)));
+        });
 
         // Modify the old file on disk
         fs.save(
