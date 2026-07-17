@@ -8,8 +8,8 @@ use editor::{
 };
 use futures::{FutureExt, select_biased};
 use gpui::{
-    AnyElement, App, AppContext as _, AsyncApp, Context, Entity, EventEmitter, FocusHandle,
-    Focusable, Font, IntoElement, Render, Task, WeakEntity, Window,
+    div, AnyElement, App, AppContext as _, AsyncApp, Context, Entity, EventEmitter, FocusHandle,
+    Focusable, Font, IntoElement, Render, Task, WeakEntity, Window, Styled, ParentElement,
 };
 use language::{Buffer, HighlightedText};
 use project::{Project, ProjectPath};
@@ -21,7 +21,7 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use ui::{Color, Icon, IconName, Label, LabelCommon as _, SharedString, prelude::*, utils::WithRemSize};
+use ui::{Color, Icon, IconName, Label, LabelCommon as _, SharedString, utils::WithRemSize};
 use util::paths::PathExt as _;
 use workspace::{
     Item, ItemHandle as _, ItemNavHistory, ToolbarItemLocation, Workspace,
