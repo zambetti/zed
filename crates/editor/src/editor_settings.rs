@@ -90,6 +90,7 @@ pub struct Toolbar {
     pub selections_menu: bool,
     pub agent_review: bool,
     pub code_actions: bool,
+    pub diff_stats: bool,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -221,6 +222,7 @@ impl Settings for EditorSettings {
                 selections_menu: toolbar.selections_menu.unwrap(),
                 agent_review: toolbar.agent_review.unwrap(),
                 code_actions: toolbar.code_actions.unwrap(),
+                diff_stats: toolbar.diff_stats.unwrap(),
             },
             scrollbar: Scrollbar {
                 show: scrollbar.show.map(ui_scrollbar_settings_from_raw).unwrap(),

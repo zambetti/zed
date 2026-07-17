@@ -421,9 +421,16 @@ impl ToolbarItemView for FileDiffToolbar {
         cx: &mut Context<Self>,
     ) -> ToolbarItemLocation {
         self._subscription = None;
+        self.file_diff = None;
+
+        if !EditorSettings::get_global(cx).toolbar.diff_stats {
+            return ToolbarItemLocation::Hidden;
+        }
+
         self.file_diff = active_pane_item
             .and_then(|item| item.act_as::<FileDiffView>(cx))
             .map(|entity| entity.downgrade());
+
         if let Some(file_diff) = self.file_diff.as_ref().and_then(|d| d.upgrade()) {
             self._subscription = Some(cx.observe(&file_diff, |_this, _, cx| {
                 cx.notify();

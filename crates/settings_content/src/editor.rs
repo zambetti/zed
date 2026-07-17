@@ -383,6 +383,10 @@ pub struct ToolbarContent {
     ///
     /// Default: false
     pub code_actions: Option<bool>,
+    /// Whether to display diff summary statistics in the editor toolbar.
+    ///
+    /// Default: true
+    pub diff_stats: Option<bool>,
 }
 
 /// Scrollbar related settings
